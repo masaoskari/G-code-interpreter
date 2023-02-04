@@ -114,7 +114,9 @@ class Machine:
                 print("Error! Cooling cannot be set off because it is not on.")
             else:
                 self.client_.coolant_off()
-
+    #Moves machine to home position
+    def move_home(self):
+        self.client_.home()
 
 #Reads G-code commands from the given file. Ignores comments and
 #other text which are not commands. Returns commands in list.
@@ -185,5 +187,9 @@ def main():
         #Turns cooling on/off, depending of given command
         elif command[0]=="M08" or command[0]=="M09":
             machine.handle_cooling(command[0])
+        #Moves machine to home position
+        elif command[0]=="G28":
+            machine.move_home()
+
 if __name__ == "__main__":
     main()
