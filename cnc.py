@@ -100,12 +100,20 @@ class Machine:
         else:
             self.client_.change_tool(self.tool_)
 
-
+    #Sets cooling on/off depending the given command. Also gives error message
+    #if the cooling is on/off and the user tries to turn it on/off.
     def handle_cooling(self, command):
         if command=="M08":
-            self.client_.coolant_on()
+            if self.is_cooling_on_==True:
+                print("The cooling is already on!")
+            else:
+                self.client_.coolant_on()
+                self.is_cooling_on_=True
         else:
-            self.client_.coolant_off()
+            if self.is_cooling_on_==False:
+                print("Error! Cooling cannot be set off because it is not on.")
+            else:
+                self.client_.coolant_off()
 
 
 #Reads G-code commands from the given file. Ignores comments and
@@ -174,6 +182,7 @@ def main():
         elif command[0]=="M06":
             if machine.change_machine_tool()==False:
                 return
+        #Turns cooling on/off, depending of given command
         elif command[0]=="M08" or command[0]=="M09":
             machine.handle_cooling(command[0])
 if __name__ == "__main__":
