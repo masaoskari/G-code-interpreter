@@ -51,7 +51,7 @@ def parse_coordinates(command:list)->tuple:
             z_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
             z=float(z_coord_string)
     return x, y, z
-#Moves spindle to given coordinates. Uses Machineclient class to show where
+#Moves spindle to given coordinates. Uses MachineClient class to show where
 #spindle is moving.
 #SOME ERROR PREVENTION SHOULD ADD HERE, eg. what if all coordinates are 0.
 def move_spindle(machine:MachineClient, coordinates:list):
@@ -68,7 +68,7 @@ def move_spindle(machine:MachineClient, coordinates:list):
     elif coordinates[0]!=0 and coordinates[1]!=0:
         machine.move(coordinates[0], coordinates[1], coordinates[2])
 
-#Finds and sets spindle feed rate. Uses Machineclient class to show where
+#Finds and sets spindle feed rate. Uses MachineClient class to show where
 #what the set feed rate is.
 def parse_and_set_feed_rate(machine:MachineClient, command:str):
     #Feed rate in mm/min
@@ -77,10 +77,20 @@ def parse_and_set_feed_rate(machine:MachineClient, command:str):
     feed_rate=float(feed_rate[0])/60
     machine.set_feed_rate(feed_rate)
 
+#Finds spindle speed (rpm) from g-code command and sets that to spindle with 
+#using MachineClient class.
 def parse_and_set_spindle_speed(machine:MachineClient, command:str):
     spindle_speed=feed_rate=re.findall(r"\d+", command)
-
     machine.set_spindle_speed(int(spindle_speed[0]))
+
+#Finds tool number from g-code command and shows that for user by using
+#MachineClient class.
+def change_machine_tool(machine:MachineClient, command:str):
+    #Finds tool number from g-code.
+    tool=re.findall(r"(?!0)\d+", command)
+    #Calling machine to use that tool.
+    machine.change_tool(tool[0])
+
 
 def main():
     #filename=sys.argv[1]
@@ -110,7 +120,9 @@ def main():
         #Spindle speed set
         elif command[0].startswith("S"):
             parse_and_set_spindle_speed(machine, command[0])
-
+        #Changing machine tool
+        elif command[0].startswith("T"):
+            change_machine_tool(machine, command[0])
 
 if __name__ == "__main__":
     main()
