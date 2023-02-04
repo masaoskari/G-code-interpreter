@@ -71,8 +71,11 @@ def move_spindle(machine:MachineClient, coordinates:list):
 #Finds and sets spindle feed rate. Uses Machineclient class to show where
 #what the set feed rate is.
 def parse_and_set_feed_rate(machine:MachineClient, command:str):
+    #Feed rate in mm/min
     feed_rate=re.findall(r"\d*\.\d?", command)
-    machine.set_feed_rate(float(feed_rate[0]))
+    #Feed rate in mm/s
+    feed_rate=float(feed_rate[0])/60
+    machine.set_feed_rate(feed_rate)
 
 def main():
     #filename=sys.argv[1]

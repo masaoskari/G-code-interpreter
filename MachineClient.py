@@ -33,16 +33,16 @@ class MachineClient:
         """
         print("Moving Z to {:.3f} [mm].".format(value))
     def set_movement_mode(self):
-        """Sets machine movement mode when G00 code is used and no coordinates
+        """Sets spindle movement mode when G00 code is used and no coordinates
         are given."""
 
-        print("Setting machine mode to rapid positioning.")
+        print("Setting spindle mode to rapid positioning.")
     def set_feed_rate(self, value):
         """ Set spindle feed rate.
         Args:
         value (float): Feed rate [mm/s]
         """
-        print("Using feed rate {} [mm/s].".format(value))
+        print("Using feed rate {:.2f} [mm/s].".format(value))
     def set_spindle_speed(self, value):
         """ Set spindle rotational speed.
         Args:
