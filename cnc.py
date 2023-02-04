@@ -80,9 +80,17 @@ class Machine:
     #Finds spindle speed (rpm) from g-code command and sets that to spindle with 
     #using MachineClient class.
     def parse_and_set_spindle_speed(self, command:list):
-        spindle_speed=feed_rate=re.findall(r"\d+", command[0])
+        spindle_speed=re.findall(r"\d+", command[0])
+        self.spindle_speed_=int(spindle_speed[0])
         self.client_.set_spindle_speed(int(spindle_speed[0]))
 
+    #Turns spindle on or off
+    def turn_spindle_on_or_off(self, command:list):
+        if command[0]=="M03":
+            self.client_.turn_rotation_on_off(True)
+        else:
+            self.client_.turn_rotation_on_off(False)
+            
     #Sets what tool will be used in machine but not change it
     def set_tool(self, command:list):
         tool=re.findall(r"\d+", command[0])
@@ -176,6 +184,9 @@ def main():
         #Spindle speed set
         elif command[0].startswith("S"):
             machine.parse_and_set_spindle_speed(command)
+        #Spindle turn on/off
+        elif command[0]=="M03" or command[0]=="M09":
+            machine.turn_spindle_on_or_off(command)
         #Setting what tool will be used in machine
         elif command[0].startswith("T"):
             machine.set_tool(command)
