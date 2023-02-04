@@ -2,10 +2,12 @@ import sys
 import re
 import MachineClient
 class Machine:
-    def __init__(self, feed_rate:float=0, tool:str="", is_cooling_on: bool=False):
+    def __init__(self, feed_rate:float=0, spindle_speed:int=0, tool:str="", \
+                 is_cooling_on: bool=False):
        #Interface object for printing what machine does
        self.client_=MachineClient.MachineClient()
        self.feed_rate_=feed_rate
+       self.spindle_speed_=spindle_speed
        self.tool_=tool
        self.is_cooling_on_=is_cooling_on
 
@@ -81,17 +83,24 @@ class Machine:
         spindle_speed=feed_rate=re.findall(r"\d+", command[0])
         self.client_.set_spindle_speed(int(spindle_speed[0]))
 
-    #Finds tool number from g-code command and shows that for user by using
-    #MachineClient class.
-    def change_machine_tool(self, command:list):
-        #Finds tool number from g-code.
-        tool=re.findall(r"(?!0)\d+", command[0])
-        #Calling machine to use that tool.
-        self.client_.change_tool(tool[0])
+    #Sets what tool will be used in machine but not change it
+    def set_tool(self, command:list):
+        tool=re.findall(r"\d+", command[0])
+        self.tool_=tool[0]
+
+    #Changes the before given tool to machine. Gives error message and stops
+    #the program if tool is not set earlier. Also stops cooling and turns
+    #spindle off.
+    def change_machine_tool(self):
+        self.spindle_speed_=0
+        self.is_cooling_on_=False
+        if self.tool_=="":
+            print("ERROR! The tool must be chosen before it can be changed.")
+            return False
+        else:
+            self.client_.change_tool(self.tool_)
 
 
-
-    
     def handle_cooling(self, command):
         if command=="M08":
             self.client_.coolant_on()
@@ -139,7 +148,7 @@ def main():
     filename="rectangle.gcode"
     #Reading files G-codes to list
     commands=read_file(filename)
-
+    print(commands)
     #Machine object to handle different commands
     machine=Machine()
     #Loop throught this g-code program
@@ -157,10 +166,14 @@ def main():
         #Spindle speed set
         elif command[0].startswith("S"):
             machine.parse_and_set_spindle_speed(command)
-        #Changing machine tool
+        #Setting what tool will be used in machine
         elif command[0].startswith("T"):
-            machine.change_machine_tool(command)
-        #M
+            machine.set_tool(command)
+        #Changes the before given tool to machine. Gives error if tool is not
+        #set and stops the program.
+        elif command[0]=="M06":
+            if machine.change_machine_tool()==False:
+                return
         elif command[0]=="M08" or command[0]=="M09":
             machine.handle_cooling(command[0])
 if __name__ == "__main__":
