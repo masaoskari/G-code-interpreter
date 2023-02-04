@@ -2,23 +2,37 @@ import sys
 import re
 import MachineClient
 class Machine:
-    def __init__(self, tool:str="", is_cooling_on: bool=False):
+    def __init__(self, feed_rate:float=0, tool:str="", is_cooling_on: bool=False):
        #Interface object for printing what machine does
        self.client_=MachineClient.MachineClient()
+       self.feed_rate_=feed_rate
        self.tool_=tool
        self.is_cooling_on_=is_cooling_on
 
     #Moves spindle to given coordinates. Uses MachineClient class to show where
-    #spindle is moving.
-    #SOME ERROR PREVENTION SHOULD ADD HERE, eg. what if all coordinates are 0.
+    #spindle is moving. Sets spindle feed rate if it's given.
     def move_spindle(self, command:list):
+        #Taking coordinates from command
         coordinates=self.parse_coordinates(command)
+        #If coordinates are not defined, setting spindle movement mode.
         if coordinates[0]==coordinates[1]==coordinates[2]==0:
             if command[0]=="G00":
                 self.client_.set_movement_mode("rapid positioning")
+            #If only G01 is given:
             elif command[0]=="G01":
                 self.client_.set_movement_mode("linear motion")
         else:
+            #Setting linear motion (G01) feed rate
+            if self.feed_rate_==0 and command[len(command)-1].startswith("F") \
+                and command[0]=="G01":
+
+                self.parse_and_set_feed_rate(command)
+            #When G01 command is given without feed rate parameter or the feed
+            #rate is not defined earlier in the program, the program gives
+            #erro message and stops.
+            elif command[0]=="G01" and self.feed_rate_==0:
+                print("ERROR! Set the feed rate before you can use cut!")
+                return False
             #Moving spindle x-position
             if coordinates[1]==0 and coordinates[2]==0:
                 self.client_.move_x(coordinates[0])
@@ -53,9 +67,12 @@ class Machine:
     #what the set feed rate is.
     def parse_and_set_feed_rate(self, command:list):
         #Feed rate in mm/min
-        feed_rate=re.findall(r"\d*\.\d?", command[0])
+        feed_rate=re.findall(r"\d*\.\d?", command[len(command)-1])
         #Feed rate in mm/s
         feed_rate=float(feed_rate[0])/60
+        if feed_rate==self.feed_rate_:
+            return
+        self.feed_rate_=feed_rate
         self.client_.set_feed_rate(feed_rate)
 
     #Finds spindle speed (rpm) from g-code command and sets that to spindle with 
@@ -99,7 +116,7 @@ def read_file(filename:str)->list:
                 for word in words:
                     #Finds G01 commands and its parameters x,z or z-coordinates
                     if re.match(r"G01", word):
-                        command=re.findall(r"G01|[XYZ]-?\d*\.\d*", line)
+                        command=re.findall(r"G01|[XYZ]-?\d*\.\d*|F\d*\.\d?", line)
                         commands.append(command)
                     #Finds G00 commands and its parameters x,z or z-coordinates
                     elif re.match(r"G00", word):
@@ -122,13 +139,15 @@ def main():
     filename="rectangle.gcode"
     #Reading files G-codes to list
     commands=read_file(filename)
+
     #Machine object to handle different commands
     machine=Machine()
     #Loop throught this g-code program
     for command in commands:
         #Moving spindle with linear motion
         if command[0]=="G01":
-            machine.move_spindle(command)
+            if machine.move_spindle(command)==False:
+                return
         #Moving spindle with rapid positioning
         elif command[0]=="G00":
             machine.move_spindle(command)
