@@ -1,6 +1,86 @@
 import sys
 import re
 import MachineClient
+class Machine:
+    def __init__(self, tool:str="", is_cooling_on: bool=False):
+       #Interface object for printing what machine does
+       self.client_=MachineClient.MachineClient()
+       self.tool_=tool
+       self.is_cooling_on_=is_cooling_on
+
+    #Moves spindle to given coordinates. Uses MachineClient class to show where
+    #spindle is moving.
+    #SOME ERROR PREVENTION SHOULD ADD HERE, eg. what if all coordinates are 0.
+    def move_spindle(self, command:list):
+        coordinates=self.parse_coordinates(command)
+        if coordinates[0]==coordinates[1]==coordinates[2]==0:
+            if command[0]=="G00":
+                self.client_.set_movement_mode("rapid positioning")
+            elif command[0]=="G01":
+                self.client_.set_movement_mode("linear motion")
+        else:
+            #Moving spindle x-position
+            if coordinates[1]==0 and coordinates[2]==0:
+                self.client_.move_x(coordinates[0])
+            #Moving spindle y-position
+            elif coordinates[0]==0 and coordinates[2]==0:
+                self.client_.move_y(coordinates[1])
+            #Moving spindle z-position
+            elif coordinates[0]==0 and coordinates[1]==0:
+                self.client_.move_z(coordinates[2])
+            #Linear movement to given xyz-coordinates
+            elif coordinates[0]!=0 and coordinates[1]!=0:
+                self.client_.move(coordinates[0], coordinates[1], coordinates[2])
+
+    #Parses x, y, z-coordinates from the command list and returns x, y, z
+    #coordinates in tuple. If commandlist doesn't contain different coordinate 
+    #that coordinate is set to 0. 
+    def parse_coordinates(self, command:list)->tuple:
+        x, y, z=0, 0, 0
+        for word in command:
+            if word.startswith("X"):
+                x_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
+                x=float(x_coord_string)
+            elif word.startswith("Y"):
+                y_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
+                y=float(y_coord_string)
+            elif word.startswith("Z"):
+                z_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
+                z=float(z_coord_string)
+        return x, y, z
+
+    #Finds and sets spindle feed rate. Uses MachineClient class to show where
+    #what the set feed rate is.
+    def parse_and_set_feed_rate(self, command:list):
+        #Feed rate in mm/min
+        feed_rate=re.findall(r"\d*\.\d?", command[0])
+        #Feed rate in mm/s
+        feed_rate=float(feed_rate[0])/60
+        self.client_.set_feed_rate(feed_rate)
+
+    #Finds spindle speed (rpm) from g-code command and sets that to spindle with 
+    #using MachineClient class.
+    def parse_and_set_spindle_speed(self, command:list):
+        spindle_speed=feed_rate=re.findall(r"\d+", command[0])
+        self.client_.set_spindle_speed(int(spindle_speed[0]))
+
+    #Finds tool number from g-code command and shows that for user by using
+    #MachineClient class.
+    def change_machine_tool(self, command:list):
+        #Finds tool number from g-code.
+        tool=re.findall(r"(?!0)\d+", command[0])
+        #Calling machine to use that tool.
+        self.client_.change_tool(tool[0])
+
+
+
+    
+    def handle_cooling(self, command):
+        if command=="M08":
+            self.client_.coolant_on()
+        else:
+            self.client_.coolant_off()
+
 
 #Reads G-code commands from the given file. Ignores comments and
 #other text which are not commands. Returns commands in list.
@@ -35,67 +115,6 @@ def read_file(filename:str)->list:
         print(f"Could not read file: {filename}")
 
     return commands
-#Parses x, y, z-coordinates from the command list and returns x, y, z
-#coordinates in tuple. If commandlist doesn't contain different coordinate that
-#coordinate is set to 0. 
-def parse_coordinates(command:list)->tuple:
-    x, y, z=0, 0, 0
-    for word in command:
-        if word.startswith("X"):
-            x_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
-            x=float(x_coord_string)
-        elif word.startswith("Y"):
-            y_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
-            y=float(y_coord_string)
-        elif word.startswith("Z"):
-            z_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
-            z=float(z_coord_string)
-    return x, y, z
-#Moves spindle to given coordinates. Uses MachineClient class to show where
-#spindle is moving.
-#SOME ERROR PREVENTION SHOULD ADD HERE, eg. what if all coordinates are 0.
-def move_spindle(machine:MachineClient, coordinates:list):
-    #Moving spindle x-position
-    if coordinates[1]==0 and coordinates[2]==0:
-        machine.move_x(coordinates[0])
-    #Moving spindle y-position
-    elif coordinates[0]==0 and coordinates[2]==0:
-        machine.move_y(coordinates[1])
-    #Moving spindle z-position
-    elif coordinates[0]==0 and coordinates[1]==0:
-        machine.move_z(coordinates[2])
-    #Linear movement to given xyz-coordinates
-    elif coordinates[0]!=0 and coordinates[1]!=0:
-        machine.move(coordinates[0], coordinates[1], coordinates[2])
-
-#Finds and sets spindle feed rate. Uses MachineClient class to show where
-#what the set feed rate is.
-def parse_and_set_feed_rate(machine:MachineClient, command:str):
-    #Feed rate in mm/min
-    feed_rate=re.findall(r"\d*\.\d?", command)
-    #Feed rate in mm/s
-    feed_rate=float(feed_rate[0])/60
-    machine.set_feed_rate(feed_rate)
-
-#Finds spindle speed (rpm) from g-code command and sets that to spindle with 
-#using MachineClient class.
-def parse_and_set_spindle_speed(machine:MachineClient, command:str):
-    spindle_speed=feed_rate=re.findall(r"\d+", command)
-    machine.set_spindle_speed(int(spindle_speed[0]))
-
-#Finds tool number from g-code command and shows that for user by using
-#MachineClient class.
-def change_machine_tool(machine:MachineClient, command:str):
-    #Finds tool number from g-code.
-    tool=re.findall(r"(?!0)\d+", command)
-    #Calling machine to use that tool.
-    machine.change_tool(tool[0])
-
-def handle_cooling(machine:MachineClient, command):
-    if command=="M08":
-        machine.coolant_on()
-    else:
-        machine.coolant_off()
 
 
 def main():
@@ -103,34 +122,27 @@ def main():
     filename="rectangle.gcode"
     #Reading files G-codes to list
     commands=read_file(filename)
-
-    #Interface object for printing what machine does
-    machine=MachineClient.MachineClient()
-    #Translating G-codes with using that interface
+    #Machine object to handle different commands
+    machine=Machine()
+    #Loop throught this g-code program
     for command in commands:
-        #Moving spindle
+        #Moving spindle with linear motion
         if command[0]=="G01":
-            coordinates=parse_coordinates(command)
-            move_spindle(machine, coordinates)
-
+            machine.move_spindle(command)
+        #Moving spindle with rapid positioning
         elif command[0]=="G00":
-            coordinates=parse_coordinates(command)
-            #If no coordinates given, machine movement 
-            if coordinates[0]==coordinates[1]==coordinates[2]==0:
-                machine.set_movement_mode()
-            else:
-                move_spindle(machine, coordinates)
+            machine.move_spindle(command)
         #Spindle feed rate set
         elif command[0].startswith("F"):
-            parse_and_set_feed_rate(machine, command[0])
+            machine.parse_and_set_feed_rate(command)
         #Spindle speed set
         elif command[0].startswith("S"):
-            parse_and_set_spindle_speed(machine, command[0])
+            machine.parse_and_set_spindle_speed(command)
         #Changing machine tool
         elif command[0].startswith("T"):
-            change_machine_tool(machine, command[0])
-
+            machine.change_machine_tool(command)
+        #M
         elif command[0]=="M08" or command[0]=="M09":
-            handle_cooling(machine, command[0])
+            machine.handle_cooling(command[0])
 if __name__ == "__main__":
     main()
