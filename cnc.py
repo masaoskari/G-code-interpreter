@@ -51,7 +51,7 @@ def parse_coordinates(command:list)->tuple:
             z_coord_string = re.findall(r"[-]?\d*\.\d+", word)[0]
             z=float(z_coord_string)
     return x, y, z
-#Moves spindle to given coordinates. Uses Machineclient class do show where
+#Moves spindle to given coordinates. Uses Machineclient class to show where
 #spindle is moving.
 #SOME ERROR PREVENTION SHOULD ADD HERE, eg. what if all coordinates are 0.
 def move_spindle(machine:MachineClient, coordinates:list):
@@ -67,6 +67,12 @@ def move_spindle(machine:MachineClient, coordinates:list):
     #Linear movement to given xyz-coordinates
     elif coordinates[0]!=0 and coordinates[1]!=0:
         machine.move(coordinates[0], coordinates[1], coordinates[2])
+
+#Finds and sets spindle feed rate. Uses Machineclient class to show where
+#what the set feed rate is.
+def parse_and_set_feed_rate(machine:MachineClient, command:str):
+    feed_rate=re.findall(r"\d*\.\d?", command)
+    machine.set_feed_rate(float(feed_rate[0]))
 
 def main():
     #filename=sys.argv[1]
@@ -89,8 +95,9 @@ def main():
                 machine.set_movement_mode()
             else:
                 move_spindle(machine, coordinates)
-
-
+        #Spindle feed rate set
+        elif command[0].startswith("F"):
+            parse_and_set_feed_rate(machine, command[0])
 
 
 if __name__ == "__main__":
