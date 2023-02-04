@@ -10,6 +10,7 @@ class Machine:
        self.spindle_speed_=spindle_speed
        self.tool_=tool
        self.is_cooling_on_=is_cooling_on
+       self.motion_mode_=""
 
     #Moves spindle to given coordinates. Uses MachineClient class to show where
     #spindle is moving. Sets spindle feed rate if it's given.
@@ -27,7 +28,6 @@ class Machine:
             #Setting linear motion (G01) feed rate
             if self.feed_rate_==0 and command[len(command)-1].startswith("F") \
                 and command[0]=="G01":
-
                 self.parse_and_set_feed_rate(command)
             #When G01 command is given without feed rate parameter or the feed
             #rate is not defined earlier in the program, the program gives
@@ -90,7 +90,7 @@ class Machine:
             self.client_.turn_rotation_on_off(True)
         else:
             self.client_.turn_rotation_on_off(False)
-            
+
     #Sets what tool will be used in machine but not change it
     def set_tool(self, command:list):
         tool=re.findall(r"\d+", command[0])
@@ -125,6 +125,29 @@ class Machine:
     #Moves machine to home position
     def move_home(self):
         self.client_.home()
+    
+    def setup_machine(self, command:list):
+        setup_text=f"[{command[0]}] "
+        if command[0]=="G17":
+            setup_text+="All commands are now to be interpreted in the XY plane."
+        elif command[0]=="G21":
+            setup_text+="Units are set to millimeters when programming."
+        elif command[0]=="G40":
+            setup_text+="Set tool radius compensation off."
+        elif command[0]=="G49":
+            setup_text+="Set tool lenght offset compensation off."
+        elif command[0]=="G80":
+            setup_text="Motion modes cancelled."
+        elif command[0]=="G94":
+            setup_text+="Feed rate mode units are set to units per minute mode."
+        elif command[0]=="G90":
+            setup_text+="Setting machine positioning mode to absolute and"\
+            " taking current position as the reference point."
+        elif command[0]=="G54":
+            setup_text+="Setting a specific coordinate system as the reference"\
+            " point for cutting a particular part."
+        self.client_.show_machine_setups(setup_text)
+
 
 #Reads G-code commands from the given file. Ignores comments and
 #other text which are not commands. Returns commands in list.
@@ -201,6 +224,17 @@ def main():
         #Moves machine to home position
         elif command[0]=="G28":
             machine.move_home()
+
+
+        #Machine setup
+        elif command[0]=="G17" or command[0]=="G21" or command[0]=="G49" \
+            or command[0]=="G80" or command[0]=="G94" or command[0]=="G90" \
+            or command[0]=="G54":
+            machine.setup_machine(command)
+
+        
+
+
 
 if __name__ == "__main__":
     main()
