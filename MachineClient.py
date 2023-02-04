@@ -32,11 +32,11 @@ class MachineClient:
         value (float): Axis absolute value [mm]
         """
         print("Moving Z to {:.3f} [mm].".format(value))
-    def set_movement_mode(self):
+    def set_movement_mode(self, mode):
         """Sets spindle movement mode when G00 code is used and no coordinates
         are given."""
 
-        print("Setting spindle mode to rapid positioning.")
+        print("Setting spindle mode to '{}'.".format(mode))
     def set_feed_rate(self, value):
         """ Set spindle feed rate.
         Args:
@@ -49,6 +49,12 @@ class MachineClient:
         value (int): Spindle speed [rpm]
         """
         print("Using spindle speed {} [rpm].".format(value))
+    def turn_rotation_on_off(self, on=bool):
+        if on:
+            print("Spindle on.")
+        else:
+            print("Spindle off.")
+            
     def change_tool(self, tool_name):
         """ Change tool with given name.
         Args:
@@ -61,3 +67,6 @@ class MachineClient:
     def coolant_off(self):
         """ Turns spindle coolant off. """
         print("Coolant turned off.")
+
+    def show_machine_setups(self, setup:str):
+        print(setup)
