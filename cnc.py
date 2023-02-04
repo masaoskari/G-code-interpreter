@@ -91,6 +91,12 @@ def change_machine_tool(machine:MachineClient, command:str):
     #Calling machine to use that tool.
     machine.change_tool(tool[0])
 
+def handle_cooling(machine:MachineClient, command):
+    if command=="M08":
+        machine.coolant_on()
+    else:
+        machine.coolant_off()
+
 
 def main():
     #filename=sys.argv[1]
@@ -124,5 +130,7 @@ def main():
         elif command[0].startswith("T"):
             change_machine_tool(machine, command[0])
 
+        elif command[0]=="M08" or command[0]=="M09":
+            handle_cooling(machine, command[0])
 if __name__ == "__main__":
     main()
