@@ -32,6 +32,11 @@ class MachineClient:
         value (float): Axis absolute value [mm]
         """
         print("Moving Z to {:.3f} [mm].".format(value))
+    def set_movement_mode(self):
+        """Sets machine movement mode when G00 code is used and no coordinates
+        are given."""
+
+        print("Setting machine mode to rapid positioning.")
     def set_feed_rate(self, value):
         """ Set spindle feed rate.
         Args:
