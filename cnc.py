@@ -77,11 +77,17 @@ def parse_and_set_feed_rate(machine:MachineClient, command:str):
     feed_rate=float(feed_rate[0])/60
     machine.set_feed_rate(feed_rate)
 
+def parse_and_set_spindle_speed(machine:MachineClient, command:str):
+    spindle_speed=feed_rate=re.findall(r"\d+", command)
+
+    machine.set_spindle_speed(int(spindle_speed[0]))
+
 def main():
     #filename=sys.argv[1]
     filename="rectangle.gcode"
     #Reading files G-codes to list
     commands=read_file(filename)
+
     #Interface object for printing what machine does
     machine=MachineClient.MachineClient()
     #Translating G-codes with using that interface
@@ -101,6 +107,9 @@ def main():
         #Spindle feed rate set
         elif command[0].startswith("F"):
             parse_and_set_feed_rate(machine, command[0])
+        #Spindle speed set
+        elif command[0].startswith("S"):
+            parse_and_set_spindle_speed(machine, command[0])
 
 
 if __name__ == "__main__":

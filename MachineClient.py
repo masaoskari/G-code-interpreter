@@ -48,7 +48,7 @@ class MachineClient:
         Args:
         value (int): Spindle speed [rpm]
         """
-        print("Using spindle speed {} [mm/s].".format(value))
+        print("Using spindle speed {} [rpm].".format(value))
     def change_tool(self, tool_name):
         """ Change tool with given name.
         Args:
