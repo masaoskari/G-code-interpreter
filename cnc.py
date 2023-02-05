@@ -1,3 +1,26 @@
+"""
+ **********Program author**********
+ Name: Matti Linna
+ E-Mail: masaoskari.linna@gmail.com
+ **********************************
+ Description:
+ This program implements a simple g-code interpreter which reads g-code program
+ from file and parses it and shows user in console what the machine will do 
+ when using that program. If the given g-code program is somehow wrote wrong 
+ the program will give error messages in common situations. For example program
+ gives an error message and stops program if the spindle feed rate is not set
+ before the machine is command to cut.
+
+ Program uses Machine class to keeping known what setups to machine is done and
+ MachineClient class to show user what g-code program does. You will find more
+ details how program works in comments below.
+
+ The program can be used by adding cnc.py, MachineClient.py and the g-code
+ program in the same folder. Then it starts with command row command:
+
+ >python cnc.py rectangle.gcode
+
+"""
 import sys
 import re
 import MachineClient
@@ -6,6 +29,7 @@ import MachineClient
 RAPID_POSITIONING="rapid positioning"
 LINEAR_MOTION="linear motion"
 
+#Machine class to keeping known what setups to cnc-machine is done.
 class Machine:
     def __init__(self, feed_rate:float=0, spindle_speed:int=0, tool:str="", \
                  is_cooling_on: bool=False):
@@ -21,9 +45,10 @@ class Machine:
     #spindle is moving. Sets spindle feed rate if it's given.
     def move_spindle(self, command:list):
 
-        #Taking coordinates from command
+        #Search coordinates from command
         coordinates=self.parse_coordinates(command)
-
+       
+       
         #Showing spindle movement mode to user (rapid or linear).
         self.check_movement_mode(command)
 
@@ -31,8 +56,7 @@ class Machine:
         if coordinates[0]!=0 or coordinates[1]!=0 or coordinates[2]!=0:
 
             #Setting linear motion (G01) feed rate
-            if self.feed_rate_==0 and command[len(command)-1].startswith("F") \
-                and command[0]=="G01":
+            if command[len(command)-1].startswith("F") and command[0]=="G01":
                 self.parse_and_set_feed_rate(command)
 
             #When G01 command is given without feed rate parameter or the feed
@@ -120,14 +144,25 @@ class Machine:
         self.spindle_speed_=int(spindle_speed[0])
         self.client_.set_spindle_speed(int(spindle_speed[0]))
 
-    #Turns spindle on or off
+
+    #Turns spindle on or off. If the spindle rotational speed is not given, the
+    #error message is given and the progam will stop.
     def turn_spindle_on_or_off(self, command:list):
+        #Spindle on
         if command[0]=="M03":
-            self.client_.turn_rotation_on_off(True)
+            #Checks that spindle speed is given before it is turned on. If it
+            #is not the program gives error message and stops.
+            if self.spindle_speed_==0:
+                print("Cannot start the spindle because spindle rotation speed"\
+                      " is not given.")
+                return False
+            else:
+                self.client_.turn_rotation_on_off(True)
+        #Spindle off if command is M05
         else:
             self.client_.turn_rotation_on_off(False)
 
-    #Sets what tool will be used in machine but not change it
+    #Sets what tool will be used in machine but not change it.
     def set_tool(self, command:list):
         tool=re.findall(r"\d+", command[0])
         self.tool_=tool[0]
@@ -136,8 +171,11 @@ class Machine:
     #the program if tool is not set earlier. Also stops cooling and turns
     #spindle off.
     def change_machine_tool(self):
+        #Stops the spindle and sets the cooling off that the tool can be changed
         self.spindle_speed_=0
         self.is_cooling_on_=False
+
+        #Changing tool if it is given earlier.
         if self.tool_=="":
             print("ERROR! The tool must be chosen before it can be changed.")
             return False
@@ -147,26 +185,34 @@ class Machine:
     #Sets cooling on/off depending the given command. Also gives error message
     #if the cooling is on/off and the user tries to turn it on/off.
     def handle_cooling(self, command:list):
+        #Cooling on
         if command[0]=="M08":
             if self.is_cooling_on_==True:
                 print("The cooling is already on!")
             else:
                 self.client_.coolant_on()
                 self.is_cooling_on_=True
+
+        #Cooling off
         elif command[0]=="M09":
             if self.is_cooling_on_==False:
                 print("Error! Cooling cannot be set off because it is not on.")
             else:
                 self.is_cooling_on_==False
                 self.client_.coolant_off()
+
     #Moves machine to home position
-    def move_home(self):
+    def move_home(self, command:list):
         self.client_.home()
+        self.move_spindle(command)
     
+    #Tells what settings are done to machine when setupping it. Uses 
+    #MachineClient class to show these settings to user.
     def setup_machine(self, command:list):
         setup_text=f"[{command[0]}] "
         if command[0]=="G17":
-            setup_text+="All commands are now to be interpreted in the XY plane."
+            setup_text+="All commands are now to be interpreted in the"\
+                " XY plane."
         elif command[0]=="G21":
             setup_text+="Units are set to millimeters when programming."
         elif command[0]=="G40":
@@ -185,37 +231,51 @@ class Machine:
             setup_text+="Setting machine positioning mode to incremental."
         elif command[0]=="G94":
             setup_text+="Feed rate mode units are set to units per minute mode."
-
+        #Showing setting text to user.
         self.client_.show_machine_setups(setup_text)
+
+    #Stops machine 
     def stop(self):
         self.client_.stop_machine()
 
-#Reads G-code commands from the given file. Ignores comments and
+#Reads G-code commands from the given file. Ignores comments, line numbers and
 #other text which are not commands. Returns commands in list.
 def read_file(filename:str)->list:
     commands=[]
     try:
         with open(filename, 'r') as file:
+
             for line in file:
                 #Ignoring comments and those initialization codes (%)
                 if line.startswith(("%","(")):
                     continue
+
                 #Using regular expressions to get those single commands to list.
-                #If command have parameters the parameters and that command is 
+                #If command have parameters, the parameters and that command is 
                 #added to list in list.
                 words=line.split(" ")
                 for word in words:
-                    #Finds G01 commands and its parameters x,z or z-coordinates
+
+                    #Finds G01 commands and its parameters x, y, z-coordinates
+                    #and feed rate.
                     if re.match(r"G01", word):
-                        command=re.findall(r"G01|[XYZ]-?\d*\.\d*|F\d*\.\d?", line)
+                        command=re.findall(r"G01|[XYZ]-?\d*\.\d*|F\d*\.\d?", \
+                                           line)
                         commands.append(command)
-                    #Finds G00 commands and its parameters x,z or z-coordinates
+
+                    #Finds G00 commands and its parameters x, y or z-coordinates
                     elif re.match(r"G00", word):
                         command=re.findall(r"G00|[XYZ]-?\d*\.\d*", line)
                         commands.append(command)
+
+                    #Finds G28 command and its parameters x, y or z-coordinates
+                    elif re.match(r"G28", word):
+                        command=re.findall(r"G28|[XYZ]-?\d*\.\d*", line)
+                        commands.append(command)
+
                     #Finds other commands that starts with G, T, M, F or S
                     #characters but that wich are not G01 or G00.
-                    elif re.match(r"(?!G01|G00)[GTMFS]\d", word):
+                    elif re.match(r"(?!G01|G00|G28)[GTMS]\d", word):
                         commands.append([word.strip()])
         file.close()
 
@@ -226,13 +286,20 @@ def read_file(filename:str)->list:
 
 
 def main():
-    #filename=sys.argv[1]
+    """if len(sys.argv)>=2:
+        filename=sys.argv[1]
+    else:
+        print("Run the program using commandline command: python cnc.py"\
+              " <g-code-filename>. Ensure that you have writed g-code program"\
+                " file name right.")
+        return"""
     filename="rectangle.gcode"
     #Reading files G-codes to list
     commands=read_file(filename)
     print(commands)
     #Machine object to handle different commands
     machine=Machine()
+    
     #Loop throught this g-code program
     for command in commands:
 
@@ -240,34 +307,41 @@ def main():
         if command[0]=="G01":
             if machine.move_spindle(command)==False:
                 return
+            
         #Moving spindle with rapid positioning
         elif command[0]=="G00":
             machine.move_spindle(command)
+
         #Spindle feed rate set
         elif command[0].startswith("F"):
             machine.parse_and_set_feed_rate(command)
+
         #Spindle speed set
         elif command[0].startswith("S"):
             machine.parse_and_set_spindle_speed(command)
+
         #Spindle turn on/off
         elif command[0]=="M03" or command[0]=="M05":
-            machine.turn_spindle_on_or_off(command)
+            if machine.turn_spindle_on_or_off(command)==False:
+                return
+            
         #Setting what tool will be used in machine
         elif command[0].startswith("T"):
             machine.set_tool(command)
+
         #Changes the before given tool to machine. Gives error if tool is not
         #set and stops the program.
         elif command[0]=="M06":
             if machine.change_machine_tool()==False:
                 return
+            
         #Turns cooling on/off, depending of given command
         elif command[0]=="M08" or command[0]=="M09":
-
             machine.handle_cooling(command)
 
         #Moves machine to home position
         elif command[0]=="G28":
-            machine.move_home()
+            machine.move_home(command)
 
         #Reading and parsing machine initial setup commands.
         elif command[0]=="G17" or command[0]=="G21" or command[0]=="G40" or\
