@@ -75,7 +75,7 @@ class Machine:
                 print("ERROR! Set the feed rate before you can use cut!")
                 return False
             
-            #Moving spindle x-position (tooks also care is spindle positioning
+            #Moving spindles x-position (tooks also care is spindle positioning
             #absolute or incremental)
             if "X" in directions and "Y" not in directions and \
                 "Z" not in directions:
@@ -87,7 +87,7 @@ class Machine:
                     self.x_=coordinates[0]
                     self.client_.move_x(coordinates[0])
 
-            #Moving spindle y-position
+            #Moving spindles y-position
             elif "Y" in directions and "X" not in directions and \
                 "Z" not in directions:
                 if self.positioning_mode_==INCREMENTAL_POSITIONING:
@@ -98,14 +98,13 @@ class Machine:
                     self.y_=coordinates[1]
                     self.client_.move_y(coordinates[1])
 
-            #Moving spindle z-position
+            #Moving spindles z-position
             elif "Z" in directions and "X" not in directions and \
                 "Y" not in directions:
-                
                 if self.positioning_mode_==INCREMENTAL_POSITIONING:
                     if coordinates[2]!=0:
                         self.client_.move_z(self.z_+coordinates[2])
-                        self.z_+=coordinates[0]
+                        self.z_+=coordinates[2]
                 else:
                     self.z_=coordinates[2]
                     self.client_.move_z(coordinates[2])
@@ -333,17 +332,20 @@ def read_file(filename:str)->list:
 
 
 def main():
-    """if len(sys.argv)>=2:
+    #Taking filename from args.
+    if len(sys.argv)>=2:
         filename=sys.argv[1]
+
+    #Error message if the commandline command is wrote wrong.
     else:
         print("Run the program using commandline command: python cnc.py"\
               " <g-code-filename>. Ensure that you have writed g-code program"\
                 " file name right.")
-        return"""
-    filename="rectangle.gcode"
+        return
+
     #Reading files G-codes to list
     commands=read_file(filename)
-    print(commands)
+
     #Machine object to handle different commands
     machine=Machine()
     
