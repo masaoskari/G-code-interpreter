@@ -28,6 +28,8 @@ import MachineClient
 #Some constant strings for program
 RAPID_POSITIONING="rapid positioning"
 LINEAR_MOTION="linear motion"
+ABSOLUTE_POSITIONING=0
+INCREMENTAL_POSITIONING=1
 
 #Machine class to keeping known what setups to cnc-machine is done.
 class Machine:
@@ -40,20 +42,27 @@ class Machine:
        self.tool_=tool
        self.is_cooling_on_=is_cooling_on
        self.motion_mode_=""
+       self.positioning_mode_=-1
+       self.x_=0
+       self.y_=0
+       self.z_=0
+    
 
     #Moves spindle to given coordinates. Uses MachineClient class to show where
     #spindle is moving. Sets spindle feed rate if it's given.
     def move_spindle(self, command:list):
 
-        #Search coordinates from command
+        #Search coordinates from command.
         coordinates=self.parse_coordinates(command)
        
-       
+        #Search directions where spindle is going to move.
+        directions=re.findall(r"[XYZ]", " ".join(command))
+    
         #Showing spindle movement mode to user (rapid or linear).
         self.check_movement_mode(command)
 
         #If some coordinates are given the spindle will move to given position.
-        if coordinates[0]!=0 or coordinates[1]!=0 or coordinates[2]!=0:
+        if len(directions)!=0:
 
             #Setting linear motion (G01) feed rate
             if command[len(command)-1].startswith("F") and command[0]=="G01":
@@ -66,23 +75,58 @@ class Machine:
                 print("ERROR! Set the feed rate before you can use cut!")
                 return False
             
-            #Moving spindle x-position
-            if coordinates[1]==0 and coordinates[2]==0:
-                self.client_.move_x(coordinates[0])
+            #Moving spindle x-position (tooks also care is spindle positioning
+            #absolute or incremental)
+            if "X" in directions and "Y" not in directions and \
+                "Z" not in directions:
+                if self.positioning_mode_==INCREMENTAL_POSITIONING:
+                    if coordinates[0]!=0:
+                        self.client_.move_x(self.x_+coordinates[0])
+                        self.x_+=coordinates[0]
+                else:
+                    self.x_=coordinates[0]
+                    self.client_.move_x(coordinates[0])
 
             #Moving spindle y-position
-            elif coordinates[0]==0 and coordinates[2]==0:
-                self.client_.move_y(coordinates[1])
+            elif "Y" in directions and "X" not in directions and \
+                "Z" not in directions:
+                if self.positioning_mode_==INCREMENTAL_POSITIONING:
+                    if coordinates[1]!=0:
+                        self.client_.move_y(self.y_+coordinates[1])
+                        self.y_+=coordinates[1]
+                else:
+                    self.y_=coordinates[1]
+                    self.client_.move_y(coordinates[1])
 
             #Moving spindle z-position
-            elif coordinates[0]==0 and coordinates[1]==0:
-                self.client_.move_z(coordinates[2])
-
-            #Linear movement to given xyz-coordinates
-            elif coordinates[0]!=0 and coordinates[1]!=0:
-                self.client_.move(coordinates[0], coordinates[1], \
-                                  coordinates[2])
+            elif "Z" in directions and "X" not in directions and \
+                "Y" not in directions:
                 
+                if self.positioning_mode_==INCREMENTAL_POSITIONING:
+                    if coordinates[2]!=0:
+                        self.client_.move_z(self.z_+coordinates[2])
+                        self.z_+=coordinates[0]
+                else:
+                    self.z_=coordinates[2]
+                    self.client_.move_z(coordinates[2])
+
+            #Linear movement to given xy-coordinates
+            elif "X" in directions and "Y" in directions and "Z" not in \
+                directions:
+                if self.positioning_mode_==INCREMENTAL_POSITIONING:
+                    if coordinates[0]!=0 or coordinates[1]!=0:
+                        self.client_.move(self.x_+coordinates[0], \
+                                          self.y_+coordinates[1])
+                        self.x_+=coordinates[0]
+                        self.y_+=coordinates[1]
+                else:
+                    self.x_=coordinates[0]
+                    self.y_=coordinates[1]
+                    self.client_.move(coordinates[0], coordinates[1], self.z_)
+
+            #There could be also movement implementations in other planes for
+            #example xz-plane...
+        
     #Checks the spindle movement mode (is it rapid or linear), sets it to
     #machine and shows that for user by using MachineClient class.
     def check_movement_mode(self, command:list):
@@ -227,8 +271,11 @@ class Machine:
         elif command[0]=="G90":
             setup_text+="Setting machine positioning mode to absolute and"\
             " taking current position as the reference point."
+            self.positioning_mode_=ABSOLUTE_POSITIONING
+            self.x_, self.y_, self.z_=0, 0, 0
         elif command[0]=="G91":
             setup_text+="Setting machine positioning mode to incremental."
+            self.positioning_mode_=INCREMENTAL_POSITIONING
         elif command[0]=="G94":
             setup_text+="Feed rate mode units are set to units per minute mode."
         #Showing setting text to user.
